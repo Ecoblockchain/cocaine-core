@@ -25,113 +25,98 @@
 
 #include <mutex>
 
-namespace cocaine {
+namespace cocaine { namespace details {
 
-template<class T, class Lockable = std::mutex>
-struct locked_ptr {
+template<class T, class Lockable = std::mutex> struct locked_ptr {
+    typedef std::unique_lock<Lockable> guard_type;
     typedef T value_type;
     typedef Lockable mutex_type;
 
-    locked_ptr(value_type& value_, mutex_type& mutex_): value(value_), guard(mutex_) { }
-    locked_ptr(locked_ptr&& o): value(o.value), guard(std::move(o.guard)) { }
+    locked_ptr(value_type& value_, mutex_type& mutex_):
+        value(value_),
+        guard(mutex_)
+    { }
 
-    T*
-    operator->() {
-        return &value;
-    }
+    locked_ptr(locked_ptr&& other):
+        value(other.value),
+        guard(std::move(other.guard))
+    { }
 
-    T&
-    operator* () {
-        return value;
-    }
+    auto operator->()        ->       value_type* { return &value; }
+    auto operator->()  const -> const value_type* { return &value; }
+    auto operator* ()        ->       value_type& { return  value; }
+    auto operator* ()  const -> const value_type& { return  value; }
 
 private:
-    value_type& value;
-    std::unique_lock<mutex_type> guard;
+    value_type      & value;
+    guard_type        guard;
 };
 
-template<class T, class Lockable>
-struct locked_ptr<const T, Lockable> {
+template<class T, class Lockable> struct locked_ptr<const T, Lockable> {
+    typedef std::unique_lock<Lockable> guard_type;
     typedef T value_type;
     typedef Lockable mutex_type;
 
-    locked_ptr(const value_type& value_, mutex_type& mutex_): value(value_), guard(mutex_) { }
-    locked_ptr(locked_ptr&& o): value(o.value), guard(std::move(o.guard)) { }
+    locked_ptr(const value_type& value_, mutex_type& mutex_):
+        value(value_),
+        guard(mutex_)
+    { }
 
-    const T*
-    operator->() const {
-        return &value;
-    }
+    locked_ptr(locked_ptr&& other):
+        value(other.value),
+        guard(std::move(other.guard))
+    { }
 
-    const T&
-    operator* () const {
-        return value;
-    }
+    auto operator->()  const -> const value_type* { return &value; }
+    auto operator* ()  const -> const value_type& { return  value; }
 
 private:
-    const value_type& value;
-    std::unique_lock<mutex_type> guard;
+    value_type const& value;
+    guard_type        guard;
 };
 
-template<class T, class Lockable = std::mutex>
-struct synchronized {
+} // namespace details
+
+template<class T, class Lockable = std::mutex> struct synchronized {
     typedef T value_type;
     typedef Lockable mutex_type;
-
-    synchronized(): m_value() { }
 
     // Implicit construction
 
-    synchronized(const value_type& value): m_value(value) { }
-    synchronized(value_type&& value): m_value(std::move(value)) { }
+    synchronized(const value_type&  value):
+        m_value(value)
+    { }
+
+    synchronized(      value_type&& value):
+        m_value(std::move(value))
+    { }
 
     // Forwarding construction
 
     template<typename... Args>
-    synchronized(Args&&... args): m_value(std::forward<Args>(args)...) { }
+    synchronized(Args&&... args):
+        m_value(std::forward<Args>(args)...)
+    { }
 
-    // Safe getters
+    // Unsafe and safe getters
 
-    typedef locked_ptr<T, Lockable> ptr_type;
-    typedef locked_ptr<const T, Lockable> const_ptr_type;
+    typedef details::locked_ptr<      value_type, mutex_type>       ptr_type;
+    typedef details::locked_ptr<const value_type, mutex_type> const_ptr_type;
 
-    auto
-    synchronize() -> ptr_type {
-        return ptr_type(m_value, m_mutex);
-    }
+    auto unsafe     ()       ->       value_type& { return m_value; }
+    auto unsafe     () const -> const value_type& { return m_value; }
 
-    auto
-    operator->() -> ptr_type {
-        return synchronize();
-    }
+    auto synchronize()       ->       ptr_type    { return       ptr_type(m_value, m_mutex); }
+    auto synchronize() const -> const_ptr_type    { return const_ptr_type(m_value, m_mutex); }
 
-    auto
-    synchronize() const -> const_ptr_type {
-        return const_ptr_type(m_value, m_mutex);
-    }
-
-    auto
-    operator->() const -> const_ptr_type {
-        return synchronize();
-    }
-
-    // Unsafe getters
-
-    auto
-    unsafe() -> value_type& {
-        return m_value;
-    }
-
-    auto
-    unsafe() const -> const value_type& {
-        return m_value;
-    }
+    auto operator-> ()       ->       ptr_type    { return synchronize(); }
+    auto operator-> () const -> const_ptr_type    { return synchronize(); }
 
     // Synchronized operations
 
     template<class F>
     auto
-    apply(F&& functor) -> decltype(functor(std::declval<value_type&>())) {
+    apply(F&& functor)       -> decltype(functor(std::declval<      value_type&>())) {
         return functor(*synchronize());
     }
 
