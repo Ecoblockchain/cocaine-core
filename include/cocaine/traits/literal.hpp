@@ -35,8 +35,8 @@ struct type_traits<char[N]> {
     static inline
     void
     pack(msgpack::packer<Stream>& target, const char* source) {
-        target.pack_raw(N - 1);
-        target.pack_raw_body(source, N - 1);
+        target.pack_bin(N - 1);
+        target.pack_bin_body(source, N - 1);
     }
 };
 
@@ -57,8 +57,8 @@ struct type_traits<literal_t> {
     static inline
     void
     pack(msgpack::packer<Stream>& target, const literal_t& source) {
-        target.pack_raw(source.size);
-        target.pack_raw_body(source.blob, source.size);
+        target.pack_bin(source.size);
+        target.pack_bin_body(source.blob, source.size);
     }
 };
 

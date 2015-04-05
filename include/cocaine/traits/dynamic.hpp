@@ -115,7 +115,7 @@ struct type_traits<dynamic_t> {
                                *end = ptr + source.via.map.size;
 
             for(; ptr < end; ++ptr) {
-                if(ptr->key.type != msgpack::type::RAW) {
+                if(ptr->key.type != msgpack::type::STR) {
                     // NOTE: The keys should be strings.
                     throw msgpack::type_error();
                 }
@@ -142,11 +142,13 @@ struct type_traits<dynamic_t> {
             target = std::move(container);
           } break;
 
-          case msgpack::type::RAW:
+          case msgpack::type::BIN:
+          case msgpack::type::EXT:
+          case msgpack::type::STR:
             target = source.as<std::string>();
             break;
 
-          case msgpack::type::DOUBLE:
+          case msgpack::type::FLOAT:
             target = source.as<double>();
             break;
 

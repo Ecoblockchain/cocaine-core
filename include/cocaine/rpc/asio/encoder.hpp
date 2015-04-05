@@ -74,8 +74,6 @@ private:
 };
 
 struct encoded_message_t {
-    friend struct io::encoder_t;
-
     template<class>
     friend struct io::encoded;
 
@@ -96,19 +94,17 @@ private:
 } // namespace aux
 
 template<class Event>
-struct encoded:
-    public aux::encoded_message_t
-{
+struct encoded: public aux::encoded_message_t {
     template<class... Args>
     encoded(uint64_t span, Args&&... args) {
+        typedef typename event_traits<Event>::argument_type argument_type;
+
         msgpack::packer<aux::encoded_buffers_t> packer(buffer);
 
         packer.pack_array(3);
 
         packer.pack(span);
         packer.pack(static_cast<uint64_t>(event_traits<Event>::id));
-
-        typedef typename event_traits<Event>::argument_type argument_type;
 
         type_traits<argument_type>::pack(packer, std::forward<Args>(args)...);
     }

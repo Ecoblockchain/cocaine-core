@@ -31,26 +31,21 @@ struct decoder_t;
 
 namespace aux {
 
-struct decoded_message_t {
-    friend struct io::decoder_t;
-
+struct decoded_message_t: public msgpack::unpacked {
     auto
     span() const -> uint64_t {
-        return object.via.array.ptr[0].as<uint64_t>();
+        return get().via.array.ptr[0].as<uint64_t>();
     }
 
     auto
     type() const -> uint64_t {
-        return object.via.array.ptr[1].as<uint64_t>();
+        return get().via.array.ptr[1].as<uint64_t>();
     }
 
     auto
     args() const -> const msgpack::object& {
-        return object.via.array.ptr[2];
+        return get().via.array.ptr[2];
     }
-
-private:
-    msgpack::object object;
 };
 
 } // namespace aux
@@ -65,30 +60,35 @@ struct decoder_t {
 
     size_t
     decode(const char* data, size_t size, message_type& message, std::error_code& ec) {
-        size_t offset = 0;
+        unpacker.reserve_buffer(size);
 
-        msgpack::unpack_return rv = msgpack::unpack(data, size, &offset, &zone, &message.object);
+        std::memmove(unpacker.buffer(), data, size);
 
-        if(rv == msgpack::UNPACK_SUCCESS || rv == msgpack::UNPACK_EXTRA_BYTES) {
-            if(message.object.type != msgpack::type::ARRAY || message.object.via.array.size < 3) {
+        unpacker.buffer_consumed(size);
+
+        try {
+            if(!unpacker.next(message)) {
+                ec = error::insufficient_bytes;
+                return size;
+            }
+
+            if(message.get().type != msgpack::type::ARRAY || message.get().via.array.size < 3) {
                 ec = error::frame_format_error;
-            } else if(message.object.via.array.ptr[0].type != msgpack::type::POSITIVE_INTEGER ||
-                      message.object.via.array.ptr[1].type != msgpack::type::POSITIVE_INTEGER ||
-                      message.object.via.array.ptr[2].type != msgpack::type::ARRAY)
+            } else if(message.get().via.array.ptr[0].type != msgpack::type::POSITIVE_INTEGER ||
+                      message.get().via.array.ptr[1].type != msgpack::type::POSITIVE_INTEGER ||
+                      message.get().via.array.ptr[2].type != msgpack::type::ARRAY)
             {
                 ec = error::frame_format_error;
             }
-        } else if(rv == msgpack::UNPACK_CONTINUE) {
-            ec = error::insufficient_bytes;
-        } else if(rv == msgpack::UNPACK_PARSE_ERROR) {
+        } catch(const msgpack::parse_error& e) {
             ec = error::parse_error;
         }
 
-        return offset;
+        return size;
     }
 
 private:
-    msgpack::zone zone;
+    msgpack::unpacker unpacker;
 };
 
 }} // namespace cocaine::io

@@ -22,7 +22,9 @@
 #define COCAINE_IO_DISPATCH_GRAPH_SERIALIZATION_TRAITS_HPP
 
 #include "cocaine/traits.hpp"
+#include "cocaine/traits/map.hpp"
 #include "cocaine/traits/optional.hpp"
+#include "cocaine/traits/tuple.hpp"
 
 #include "cocaine/rpc/graph.hpp"
 
@@ -34,13 +36,13 @@ struct type_traits<graph_node_t> {
     static inline
     void
     pack(msgpack::packer<Stream>& target, const graph_node_t& source) {
-        target << static_cast<const graph_node_t::base_type&>(source);
+        type_traits<graph_node_t::base_type>::pack(target, source);
     }
 
     static inline
     void
     unpack(const msgpack::object& source, graph_node_t& target) {
-        source >> static_cast<graph_node_t::base_type&>(target);
+        type_traits<graph_node_t::base_type>::unpack(source, target);
     }
 };
 

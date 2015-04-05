@@ -357,24 +357,4 @@ struct type_traits<std::pair<T, U>> {
 
 }} // namespace cocaine::io
 
-namespace msgpack {
-
-template<class... Args>
-inline
-std::tuple<Args...>&
-operator>>(object o, std::tuple<Args...>& t) {
-    cocaine::io::type_traits<std::tuple<Args...>>::unpack(o, t);
-    return t;
-}
-
-template<class Stream, class... Args>
-inline
-packer<Stream>&
-operator<<(packer<Stream>& p, const std::tuple<Args...>& t) {
-    cocaine::io::type_traits<std::tuple<Args...>>::pack(p, t);
-    return p;
-}
-
-} // namespace msgpack
-
 #endif

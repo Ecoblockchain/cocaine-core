@@ -42,11 +42,13 @@ struct type_traits<blackhole::attribute::value_t> {
     void
     unpack(const msgpack::object& source, blackhole::attribute::value_t& target) {
         switch(source.type) {
-          case msgpack::type::RAW:
+          case msgpack::type::BIN:
+          case msgpack::type::EXT:
+          case msgpack::type::STR:
             target = source.as<std::string>();
             break;
 
-          case msgpack::type::DOUBLE:
+          case msgpack::type::FLOAT:
             target = source.as<double>();
             break;
 
