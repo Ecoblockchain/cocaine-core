@@ -80,7 +80,7 @@ struct function_slot:
     );
 
     typedef typename bft::function_type<typename mpl::push_front<
-        typename basic_slot<Event>::sequence_type,
+        typename event_traits<Event>::sequence_type,
         R
     >::type>::type function_type;
 

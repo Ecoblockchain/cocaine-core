@@ -30,8 +30,6 @@
 
 #include "cocaine/rpc/traversal.hpp"
 
-#include "cocaine/traits/tuple.hpp"
-
 #include <boost/mpl/transform.hpp>
 #include <boost/mpl/lambda.hpp>
 
@@ -101,9 +99,7 @@ class dispatch:
 
     typedef typename mpl::transform<
         typename io::messages<Tag>::type,
-        typename mpl::lambda<
-            std::shared_ptr<io::basic_slot<mpl::_1>>
-        >::type
+        typename mpl::lambda<std::shared_ptr<io::basic_slot<mpl::_1>>>::type
     >::type slot_types;
 
     typedef std::map<
@@ -113,18 +109,6 @@ class dispatch:
 
     synchronized<slot_map_t> m_slots;
 
-    // Slot traits
-
-    template<class T, class Event>
-    struct is_slot:
-        public std::false_type
-    { };
-
-    template<class T, class Event>
-    struct is_slot<std::shared_ptr<T>, Event>:
-        public std::is_base_of<io::basic_slot<Event>, T>
-    { };
-
 public:
     explicit
     dispatch(const std::string& name):
@@ -133,7 +117,7 @@ public:
 
     template<class Event, class F>
     dispatch&
-    on(const F& callable, typename boost::disable_if<is_slot<F, Event>>::type* = nullptr);
+    on(const F& callable, typename boost::disable_if<io::is_slot<F, Event>>::type* = nullptr);
 
     template<class Event>
     dispatch&
@@ -189,12 +173,12 @@ struct select<streamed<R>, Event> {
     typedef io::deferred_slot<streamed, Event> type;
 };
 
-// Slot invocation with arguments provided as a MessagePack object
+// Slot invocation with arguments
 
 struct calling_visitor_t:
     public boost::static_visitor<boost::optional<io::dispatch_ptr_t>>
 {
-    calling_visitor_t(const msgpack::object& unpacked_, const io::upstream_ptr_t& upstream_):
+    calling_visitor_t(const io::decoder_t::message_type& unpacked_, const io::upstream_ptr_t& upstream_):
         unpacked(unpacked_),
         upstream(upstream_)
     { }
@@ -204,23 +188,12 @@ struct calling_visitor_t:
     operator()(const std::shared_ptr<io::basic_slot<Event>>& slot) const {
         typedef io::basic_slot<Event> slot_type;
 
-        // Unpacked arguments storage.
-        typename slot_type::tuple_type args;
-
-        try {
-            // NOTE: Unpacks the object into a tuple using the argument typelist unlike using plain
-            // tuple type traits, in order to support parameter tags, like optional<T>.
-            io::type_traits<typename io::event_traits<Event>::argument_type>::unpack(unpacked, args);
-        } catch(const msgpack::type_error& e) {
-            throw std::system_error(error::invalid_argument, e.what());
-        }
-
         // Call the slot with the upstream constrained with the event's upstream protocol type tag.
-        return result_type((*slot)(std::move(args), typename slot_type::upstream_type(upstream)));
+        return result_type((*slot)(unpacked.args<Event>(), typename slot_type::upstream_type(upstream)));
     }
 
 private:
-    const msgpack::object&    unpacked;
+    const io::decoder_t::message_type& unpacked;
     const io::upstream_ptr_t& upstream;
 };
 
@@ -229,7 +202,7 @@ private:
 template<class Tag>
 template<class Event, class F>
 dispatch<Tag>&
-dispatch<Tag>::on(const F& callable, typename boost::disable_if<is_slot<F, Event>>::type*) {
+dispatch<Tag>::on(const F& callable, typename boost::disable_if<io::is_slot<F, Event>>::type*) {
     typedef typename aux::select<
         typename result_of<F>::type,
         Event
@@ -263,7 +236,7 @@ dispatch<Tag>::forget() {
 template<class Tag>
 boost::optional<io::dispatch_ptr_t>
 dispatch<Tag>::process(const io::decoder_t::message_type& message, const io::upstream_ptr_t& upstream) const {
-    return process(message.type(), aux::calling_visitor_t(message.args(), upstream));
+    return process(message.type(), aux::calling_visitor_t(message, upstream));
 }
 
 template<class Tag>

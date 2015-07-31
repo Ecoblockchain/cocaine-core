@@ -30,6 +30,7 @@
 #include <boost/mpl/find.hpp>
 #include <boost/mpl/insert_range.hpp>
 #include <boost/mpl/list.hpp>
+#include <boost/mpl/transform.hpp>
 
 namespace cocaine { namespace io {
 
@@ -128,7 +129,7 @@ template<class Event>
 struct event_traits {
     enum constants { id = aux::enumerate<Event>::value };
 
-    // Tuple is the type list of the message arguments.
+    // This is the type list of the message arguments.
     // By default, all messages have no arguments, the only information they provide is their type.
     typedef typename aux::argument_type<Event>::type argument_type;
 
@@ -136,6 +137,11 @@ struct event_traits {
         sanitize<argument_type>::value,
         "mixing optional and non-optional message arguments is not allowed"
     );
+
+    typedef typename mpl::transform<
+        argument_type,
+        typename mpl::lambda<details::unwrap_type<mpl::_1>>::type
+    >::type sequence_type;
 
     // Dispatch is a protocol tag type of the service channel dispatch after the given message is
     // successfully processed. The possible transitions types are: void, recursive protocol tag or

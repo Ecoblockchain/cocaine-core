@@ -38,16 +38,9 @@ class basic_slot {
     typedef event_traits<event_type> traits_type;
 
 public:
-    typedef typename mpl::transform<
-        typename traits_type::argument_type,
-        typename mpl::lambda<
-            io::details::unwrap_type<mpl::_1>
-        >::type
-    >::type sequence_type;
-
     // Expected dispatch, parameter and upstream types.
     typedef dispatch<typename traits_type::dispatch_type> dispatch_type;
-    typedef typename tuple::fold<sequence_type>::type     tuple_type;
+    typedef typename tuple::fold<typename traits_type::sequence_type>::type tuple_type;
     typedef upstream<typename traits_type::upstream_type> upstream_type;
 
     virtual
@@ -59,6 +52,18 @@ public:
     boost::optional<std::shared_ptr<const dispatch_type>>
     operator()(tuple_type&& args, upstream_type&& upstream) = 0;
 };
+
+// Slot traits
+
+template<class T, class Event>
+struct is_slot:
+    public std::false_type
+{ };
+
+template<class T, class Event>
+struct is_slot<std::shared_ptr<T>, Event>:
+    public std::is_base_of<io::basic_slot<Event>, T>
+{ };
 
 template<class Event>
 struct is_recursed:

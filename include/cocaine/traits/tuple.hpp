@@ -26,7 +26,7 @@
 #include "cocaine/platform.hpp"
 #include "cocaine/rpc/tags.hpp"
 
-#include <tuple>
+#include <cocaine/tuple.hpp>
 
 #include <boost/mpl/begin.hpp>
 #include <boost/mpl/count_if.hpp>

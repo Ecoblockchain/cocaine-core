@@ -26,7 +26,10 @@
 #include "cocaine/hpack/header.hpp"
 #include "cocaine/hpack/msgpack_traits.hpp"
 
+#include "cocaine/rpc/protocol.hpp"
+
 #include "cocaine/traits.hpp"
+#include "cocaine/traits/tuple.hpp"
 
 #include <boost/range/algorithm/find_if.hpp>
 
@@ -49,9 +52,20 @@ struct decoded_message_t {
         return object.via.array.ptr[1].as<uint64_t>();
     }
 
+    template<class Event, class Traits = event_traits<Event>>
     auto
-    args() const -> const msgpack::object& {
-        return object.via.array.ptr[2];
+    args() const -> typename tuple::fold<typename Traits::sequence_type>::type {
+        typename tuple::fold<typename Traits::sequence_type>::type args;
+
+        try {
+            // NOTE: Unpacks the object into a tuple using the argument typelist unlike using plain
+            // sequence typelist, in order to support parameter tags, like optional<T>.
+            type_traits<typename Traits::argument_type>::unpack(object.via.array.ptr[2], args);
+        } catch(const msgpack::type_error& e) {
+            throw std::system_error(error::invalid_argument, e.what());
+        }
+
+        return args;
     }
 
     template<class Header>
